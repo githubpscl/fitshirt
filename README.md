@@ -1,5 +1,9 @@
 # FitShirt
 
+**Live:** <https://fitshirt-roan.vercel.app>
+**Admin:** <https://fitshirt-roan.vercel.app/admin> (Passwort: `admin123`)
+**Repo:** <https://github.com/githubpscl/fitshirt>
+
 Massgeschneiderte T-Shirts auf Basis von Koerpermassen und Fit-Praeferenz.
 
 - **Frontend:** React + Vite + Tailwind CSS (mobile-first, Deutsch)
