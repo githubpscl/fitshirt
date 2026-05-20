@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(git --version)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(node dev-server.js)",
+      "Bash(curl -s http://localhost:3001/api/health)",
+      "Bash(curl -s -X POST http://localhost:3001/api/match -H \"Content-Type: application/json\" -d '{\"measurements\":{\"height\":180,\"weight\":78,\"chest\":100,\"shoulder\":46,\"armLength\":62,\"upperArm\":33,\"waist\":85,\"hip\":98,\"backLength\":47,\"neck\":40},\"fitPreference\":\"athletic\",\"sleeveType\":\"kurzarm\",\"lengthPreference\":\"normal\"}')"
+    ]
+  }
+}
