@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { ArrowRight, ArrowLeft, Loader2, CircleAlert } from 'lucide-react';
 import WizardSteps from '../components/WizardSteps.jsx';
 import MeasurementInput from '../components/MeasurementInput.jsx';
@@ -61,6 +61,8 @@ export default function Configurator() {
   const [match, setMatch] = useState(null);
   const [tuning, setTuning] = useState({});
   const [customer, setCustomer] = useState({ firstName: '', lastName: '', email: '', address: '' });
+  const [acceptedAgb, setAcceptedAgb] = useState(false);
+  const [acceptedWiderruf, setAcceptedWiderruf] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -328,7 +330,36 @@ export default function Configurator() {
               </div>
             </div>
 
-            <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
+            <div className="mt-6 space-y-3 border-t border-primary-100 pt-6">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={acceptedAgb}
+                  onChange={(e) => setAcceptedAgb(e.target.checked)}
+                />
+                <span className="text-sm text-primary-600">
+                  Ich habe die <Link to="/agb" target="_blank" className="text-primary underline">AGB</Link> und{' '}
+                  <Link to="/datenschutz" target="_blank" className="text-primary underline">Datenschutzerklaerung</Link>{' '}
+                  gelesen und akzeptiere sie.
+                </span>
+              </label>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={acceptedWiderruf}
+                  onChange={(e) => setAcceptedWiderruf(e.target.checked)}
+                />
+                <span className="text-sm text-primary-600">
+                  Mir ist bewusst, dass dieses T-Shirt nach meinen Massen einzeln gefertigt wird
+                  und daher <strong>kein Widerrufsrecht</strong> besteht (§312g Abs. 2 Nr. 1 BGB).
+                  Details: <Link to="/widerruf" target="_blank" className="text-primary underline">Widerrufsbelehrung</Link>.
+                </span>
+              </label>
+            </div>
+
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
               <div>
                 <div className="text-3xl font-semibold text-primary">{PRICE} €</div>
                 <div className="text-xs text-primary-400">inkl. MwSt., versandkostenfrei in DE</div>
@@ -343,7 +374,8 @@ export default function Configurator() {
                   disabled={
                     loading || !match ||
                     !customer.firstName || !customer.lastName ||
-                    !customer.email || !customer.address
+                    !customer.email || !customer.address ||
+                    !acceptedAgb || !acceptedWiderruf
                   }
                 >
                   {loading ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}

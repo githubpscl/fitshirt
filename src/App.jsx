@@ -4,6 +4,10 @@ import Home from './pages/Home.jsx';
 import Configurator from './pages/Configurator.jsx';
 import OrderConfirmation from './pages/OrderConfirmation.jsx';
 import Admin from './pages/Admin.jsx';
+import Impressum from './pages/Impressum.jsx';
+import Datenschutz from './pages/Datenschutz.jsx';
+import AGB from './pages/AGB.jsx';
+import Widerruf from './pages/Widerruf.jsx';
 
 function Header() {
   const { pathname } = useLocation();
@@ -29,9 +33,14 @@ function Header() {
 function Footer() {
   return (
     <footer className="border-t border-primary-100 mt-24">
-      <div className="max-w-6xl mx-auto px-4 py-8 text-sm text-primary-400 flex flex-col sm:flex-row sm:justify-between gap-2">
+      <div className="max-w-6xl mx-auto px-4 py-8 text-sm text-primary-400 flex flex-col sm:flex-row sm:justify-between gap-4">
         <span>© {new Date().getFullYear()} FitShirt — Made-to-measure T-Shirts.</span>
-        <span>Versand innerhalb von 10–14 Werktagen.</span>
+        <nav className="flex flex-wrap gap-x-4 gap-y-1">
+          <Link to="/impressum" className="hover:text-primary">Impressum</Link>
+          <Link to="/datenschutz" className="hover:text-primary">Datenschutz</Link>
+          <Link to="/agb" className="hover:text-primary">AGB</Link>
+          <Link to="/widerruf" className="hover:text-primary">Widerruf</Link>
+        </nav>
       </div>
     </footer>
   );
@@ -47,6 +56,10 @@ export default function App() {
           <Route path="/konfigurator" element={<Configurator />} />
           <Route path="/bestellung/:id" element={<OrderConfirmation />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/impressum" element={<Impressum />} />
+          <Route path="/datenschutz" element={<Datenschutz />} />
+          <Route path="/agb" element={<AGB />} />
+          <Route path="/widerruf" element={<Widerruf />} />
           <Route path="*" element={<div className="max-w-6xl mx-auto px-4 py-24 text-center"><h1 className="text-3xl">Seite nicht gefunden</h1></div>} />
         </Routes>
       </main>
