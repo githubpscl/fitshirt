@@ -60,8 +60,15 @@ export default function OrderConfirmation() {
         </div>
 
         <div className="grid sm:grid-cols-2 gap-6 py-6">
-          <Block label="Schnitt">{order.patternName} <span className="text-primary-400">({order.patternId})</span></Block>
+          <Block label="Produktion">
+            {order.productionType === 'mtm'
+              ? <>Made-to-Measure <span className="text-primary-400">(Massanfertigung)</span></>
+              : <>Smart Match <span className="text-primary-400">(80 Schnitte)</span></>}
+          </Block>
           <Block label="Fit">{capitalize(order.fitGroup)}</Block>
+          {order.productionType === 'match' && (
+            <Block label="Schnitt">{order.patternName} <span className="text-primary-400">({order.patternId})</span></Block>
+          )}
           <Block label="Farbe">
             <span className="inline-flex items-center gap-2">
               <span className="inline-block w-4 h-4 rounded-full ring-1 ring-primary-200" style={{ backgroundColor: color?.hex || '#999' }} />
@@ -86,7 +93,11 @@ export default function OrderConfirmation() {
         <div className="mt-8 p-4 bg-accent-50 border border-accent-200 rounded-md flex items-start gap-3">
           <Package size={20} className="text-primary mt-0.5" />
           <div className="text-sm text-primary-600">
-            <strong>Wird innerhalb von 10–14 Werktagen gefertigt.</strong>
+            <strong>
+              {order.productionType === 'mtm'
+                ? 'Wird in 3–4 Wochen in unserer EU-Manufaktur einzeln gefertigt.'
+                : 'Wird innerhalb von 10–14 Werktagen gefertigt.'}
+            </strong>
             <br />
             Du erhaeltst eine E-Mail an <span className="text-primary">{order.customer.email}</span>, sobald deine Bestellung versendet wird.
           </div>

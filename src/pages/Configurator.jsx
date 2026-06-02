@@ -1,10 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowRight, ArrowLeft, Loader2, CircleAlert } from 'lucide-react';
 import WizardSteps from '../components/WizardSteps.jsx';
 import MeasurementInput from '../components/MeasurementInput.jsx';
 import FitSilhouette from '../components/FitSilhouette.jsx';
 import { api, COLORS } from '../lib/api.js';
+
+const DRAFT_KEY = 'fitshirt_configurator_draft_v1';
 
 const MEASUREMENT_FIELDS = [
   { key: 'height',     label: 'Koerpergroesse',   min: 150, max: 210, hint: 'Stehend ohne Schuhe, vom Scheitel bis zum Boden.', warning: [155, 205] },
@@ -43,28 +45,55 @@ const LENGTH_OPTIONS = [
   { id: 'lang', label: 'Lang (+3 cm)' },
 ];
 
-const PRICE = 65;
+const PRICE_MATCH = 65;
+const PRICE_MTM = 129;
 
 function emptyMeasurements() {
   return Object.fromEntries(MEASUREMENT_FIELDS.map((f) => [f.key, '']));
 }
 
+// Read the saved draft once on mount. Stored in sessionStorage, so a tab
+// reload doesn't lose progress, but closing the tab does (we don't want
+// stale measurements lingering forever).
+function loadDraft() {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
 export default function Configurator() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1);
-  const [measurements, setMeasurements] = useState(emptyMeasurements());
-  const [fit, setFit] = useState('athletic');
-  const [sleeve, setSleeve] = useState('kurzarm');
-  const [neck, setNeck] = useState('rundhals');
-  const [lengthPref, setLengthPref] = useState('normal');
-  const [color, setColor] = useState('navy');
+  const draft = loadDraft();
+  const [step, setStep] = useState(draft?.step || 1);
+  const [measurements, setMeasurements] = useState(draft?.measurements || emptyMeasurements());
+  const [fit, setFit] = useState(draft?.fit || 'athletic');
+  const [sleeve, setSleeve] = useState(draft?.sleeve || 'kurzarm');
+  const [neck, setNeck] = useState(draft?.neck || 'rundhals');
+  const [lengthPref, setLengthPref] = useState(draft?.lengthPref || 'normal');
+  const [color, setColor] = useState(draft?.color || 'navy');
   const [match, setMatch] = useState(null);
   const [tuning, setTuning] = useState({});
+  const [productionType, setProductionType] = useState(draft?.productionType || 'match');
+  // Customer data is intentionally NOT restored — that's PII and shouldn't
+  // linger in storage across navigations.
   const [customer, setCustomer] = useState({ firstName: '', lastName: '', email: '', address: '' });
   const [acceptedAgb, setAcceptedAgb] = useState(false);
   const [acceptedWiderruf, setAcceptedWiderruf] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Persist non-PII wizard state across reloads.
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+        step, measurements, fit, sleeve, neck, lengthPref, color, productionType,
+      }));
+    } catch { /* storage full or blocked — silently ignore */ }
+  }, [step, measurements, fit, sleeve, neck, lengthPref, color, productionType]);
 
   const filled = useMemo(() => {
     return MEASUREMENT_FIELDS.every((f) => {
@@ -79,14 +108,21 @@ export default function Configurator() {
     return out;
   }, [measurements]);
 
-  const tunedShirtMeasurements = useMemo(() => {
+  const activeShirtSpec = useMemo(() => {
     if (!match) return null;
-    const out = { ...match.shirtMeasurements };
+    return productionType === 'mtm' && match.mtm ? match.mtm.shirtMeasurements : match.shirtMeasurements;
+  }, [match, productionType]);
+
+  const tunedShirtMeasurements = useMemo(() => {
+    if (!activeShirtSpec) return null;
+    const out = { ...activeShirtSpec };
     for (const [k, v] of Object.entries(tuning)) {
-      if (v !== undefined) out[k] = Math.round((Number(match.shirtMeasurements[k] || 0) + Number(v)) * 10) / 10;
+      if (v !== undefined) out[k] = Math.round((Number(activeShirtSpec[k] || 0) + Number(v)) * 10) / 10;
     }
     return out;
-  }, [match, tuning]);
+  }, [activeShirtSpec, tuning]);
+
+  const currentPrice = productionType === 'mtm' ? PRICE_MTM : PRICE_MATCH;
 
   async function runMatch() {
     setLoading(true);
@@ -121,9 +157,11 @@ export default function Configurator() {
     setLoading(true);
     setError('');
     try {
+      const isMtm = productionType === 'mtm';
       const order = await api.createOrder({
-        patternId: match.patternId,
-        patternName: match.patternName,
+        productionType,
+        patternId: isMtm ? null : match.patternId,
+        patternName: isMtm ? null : match.patternName,
         fitGroup: match.fitGroup,
         color,
         sleeveType: sleeve,
@@ -131,10 +169,18 @@ export default function Configurator() {
         lengthPreference: lengthPref,
         measurements: measurementsNumeric,
         shirtMeasurements: tunedShirtMeasurements,
-        customer,
-        price: PRICE,
-        matchScore: match.matchScore,
+        customer: {
+          firstName: customer.firstName,
+          lastName: customer.lastName,
+          email: customer.email,
+          address: customer.address,
+        },
+        website: customer.website, // honeypot
+        price: currentPrice,
+        matchScore: isMtm ? 100 : match.matchScore,
       });
+      // Clear the draft on success so a fresh wizard starts next time.
+      try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
       navigate(`/bestellung/${order.orderId}`);
     } catch (e) {
       setError(e.message || 'Bestellung fehlgeschlagen');
@@ -222,32 +268,83 @@ export default function Configurator() {
 
       {step === 3 && (
         <div className="space-y-6 animate-fade-in">
+          {match && (
+            <div className="card p-6 sm:p-8">
+              <h3 className="text-lg font-semibold text-primary mb-1">Wie soll dein Shirt produziert werden?</h3>
+              <p className="text-sm text-primary-400 mb-5">Du kannst spaeter nicht mehr wechseln.</p>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <button
+                  onClick={() => setProductionType('match')}
+                  className={`text-left p-5 rounded-xl border-2 transition-all
+                    ${productionType === 'match' ? 'border-primary bg-primary-50' : 'border-primary-100 hover:border-primary-200'}`}
+                >
+                  <div className="flex items-baseline justify-between mb-2">
+                    <span className="font-semibold text-primary">Smart Match</span>
+                    <span className="text-xl font-semibold text-primary">{PRICE_MATCH} €</span>
+                  </div>
+                  <ul className="text-sm text-primary-500 space-y-1">
+                    <li>+ Algorithmus waehlt aus 80 Schnitten den besten</li>
+                    <li>+ Lieferung in 10–14 Werktagen</li>
+                    <li>+ Passgenauigkeit aktuell: <strong>{match.matchScore}%</strong></li>
+                  </ul>
+                </button>
+                <button
+                  onClick={() => setProductionType('mtm')}
+                  className={`text-left p-5 rounded-xl border-2 transition-all relative
+                    ${productionType === 'mtm' ? 'border-primary bg-primary-50' : 'border-primary-100 hover:border-primary-200'}`}
+                >
+                  <span className="absolute -top-2 right-4 bg-accent text-primary text-xs px-2 py-0.5 rounded-full font-medium">100% Mass</span>
+                  <div className="flex items-baseline justify-between mb-2">
+                    <span className="font-semibold text-primary">Made-to-Measure</span>
+                    <span className="text-xl font-semibold text-primary">{PRICE_MTM} €</span>
+                  </div>
+                  <ul className="text-sm text-primary-500 space-y-1">
+                    <li>+ Schnitt exakt nach deinen Massen</li>
+                    <li>+ Einzelanfertigung in EU-Manufaktur</li>
+                    <li>+ Lieferung in 3–4 Wochen</li>
+                  </ul>
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="card p-6 sm:p-10">
-            <h2 className="text-2xl font-semibold text-primary mb-6">Deine Passform</h2>
+            <h2 className="text-2xl font-semibold text-primary mb-6">
+              {productionType === 'mtm' ? 'Deine Mass-Spezifikation' : 'Deine Passform'}
+            </h2>
 
             {loading && !match && (
               <div className="flex items-center gap-3 text-primary-400 py-8">
-                <Loader2 size={20} className="animate-spin" /> Wir suchen deinen Schnitt...
+                <Loader2 size={20} className="animate-spin" /> Wir berechnen deinen Schnitt...
               </div>
             )}
 
             {match && (
               <>
                 <div className="flex flex-wrap items-baseline gap-3 mb-4">
-                  <div className="text-3xl font-semibold text-primary">{match.matchScore}%</div>
-                  <div className="text-primary-400">Match — {match.patternName}</div>
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                    match.confidence === 'high' ? 'bg-green-100 text-green-700' :
-                    match.confidence === 'medium' ? 'bg-amber-100 text-amber-700' :
-                    'bg-red-100 text-red-700'
-                  }`}>{match.confidence}</span>
+                  {productionType === 'mtm' ? (
+                    <>
+                      <div className="text-3xl font-semibold text-primary">100%</div>
+                      <div className="text-primary-400">Massanfertigung — exakt nach deinen Massen</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-3xl font-semibold text-primary">{match.matchScore}%</div>
+                      <div className="text-primary-400">Match — {match.patternName}</div>
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        match.confidence === 'high' ? 'bg-green-100 text-green-700' :
+                        match.confidence === 'medium' ? 'bg-amber-100 text-amber-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>{match.confidence}</span>
+                    </>
+                  )}
                 </div>
 
-                {match.outlier && (
+                {productionType === 'match' && match.outlier && (
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded text-amber-800 text-sm mb-4">
-                    Dein Koerpertyp ist besonders — wir empfehlen dir, uns direkt unter
-                    {' '}<a className="underline" href="mailto:fit@fitshirt.de">fit@fitshirt.de</a>{' '}
-                    zu kontaktieren, damit wir gemeinsam den besten Schnitt finden.
+                    Dein Koerpertyp passt nicht perfekt zu unseren Standard-Schnitten —
+                    wir empfehlen dir die <button onClick={() => setProductionType('mtm')} className="underline font-medium">Made-to-Measure-Option</button>
+                    {' '}fuer maximale Passgenauigkeit.
                   </div>
                 )}
 
@@ -271,7 +368,7 @@ export default function Configurator() {
                   ))}
                 </div>
 
-                {match.alternatives?.length > 0 && (
+                {productionType === 'match' && match.alternatives?.length > 0 && (
                   <div className="mt-6 pt-6 border-t border-primary-100">
                     <div className="text-xs text-primary-400 uppercase tracking-wider mb-2">Alternative Schnitte</div>
                     <div className="flex flex-wrap gap-2">
@@ -328,6 +425,17 @@ export default function Configurator() {
                 <textarea rows={3} className="input" value={customer.address}
                   onChange={(e) => setCustomer({ ...customer, address: e.target.value })} />
               </div>
+              {/* Honeypot: invisible to humans, bots fill it. Server rejects orders with this set. */}
+              <input
+                type="text"
+                name="website"
+                value={customer.website || ''}
+                onChange={(e) => setCustomer({ ...customer, website: e.target.value })}
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+                style={{ position: 'absolute', left: '-10000px', width: '1px', height: '1px', opacity: 0 }}
+              />
             </div>
 
             <div className="mt-6 space-y-3 border-t border-primary-100 pt-6">
@@ -361,8 +469,12 @@ export default function Configurator() {
 
             <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
               <div>
-                <div className="text-3xl font-semibold text-primary">{PRICE} €</div>
-                <div className="text-xs text-primary-400">inkl. MwSt., versandkostenfrei in DE</div>
+                <div className="text-3xl font-semibold text-primary">{currentPrice} €</div>
+                <div className="text-xs text-primary-400">
+                  {productionType === 'mtm'
+                    ? 'Massanfertigung · 3–4 Wochen · inkl. MwSt., versandkostenfrei DE'
+                    : 'Smart Match · 10–14 Werktage · inkl. MwSt., versandkostenfrei DE'}
+                </div>
               </div>
               <div className="flex gap-3">
                 <button className="btn-ghost" onClick={() => setStep(2)}>

@@ -1,13 +1,26 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Shirt } from 'lucide-react';
+import { Shirt, Loader2 } from 'lucide-react';
 import Home from './pages/Home.jsx';
-import Configurator from './pages/Configurator.jsx';
-import OrderConfirmation from './pages/OrderConfirmation.jsx';
-import Admin from './pages/Admin.jsx';
-import Impressum from './pages/Impressum.jsx';
-import Datenschutz from './pages/Datenschutz.jsx';
-import AGB from './pages/AGB.jsx';
-import Widerruf from './pages/Widerruf.jsx';
+import ConsentBanner from './components/ConsentBanner.jsx';
+
+// Lazy-load secondary routes so the initial bundle stays small.
+// The home page is bundled eagerly because most first-time visits land there.
+const Configurator = lazy(() => import('./pages/Configurator.jsx'));
+const OrderConfirmation = lazy(() => import('./pages/OrderConfirmation.jsx'));
+const Admin = lazy(() => import('./pages/Admin.jsx'));
+const Impressum = lazy(() => import('./pages/Impressum.jsx'));
+const Datenschutz = lazy(() => import('./pages/Datenschutz.jsx'));
+const AGB = lazy(() => import('./pages/AGB.jsx'));
+const Widerruf = lazy(() => import('./pages/Widerruf.jsx'));
+
+function RouteFallback() {
+  return (
+    <div className="max-w-6xl mx-auto px-4 py-24 flex items-center justify-center text-primary-400">
+      <Loader2 size={28} className="animate-spin" />
+    </div>
+  );
+}
 
 function Header() {
   const { pathname } = useLocation();
@@ -51,19 +64,22 @@ export default function App() {
     <div className="flex flex-col min-h-screen">
       <Header />
       <main className="flex-1 animate-fade-in">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/konfigurator" element={<Configurator />} />
-          <Route path="/bestellung/:id" element={<OrderConfirmation />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="/impressum" element={<Impressum />} />
-          <Route path="/datenschutz" element={<Datenschutz />} />
-          <Route path="/agb" element={<AGB />} />
-          <Route path="/widerruf" element={<Widerruf />} />
-          <Route path="*" element={<div className="max-w-6xl mx-auto px-4 py-24 text-center"><h1 className="text-3xl">Seite nicht gefunden</h1></div>} />
-        </Routes>
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/konfigurator" element={<Configurator />} />
+            <Route path="/bestellung/:id" element={<OrderConfirmation />} />
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/impressum" element={<Impressum />} />
+            <Route path="/datenschutz" element={<Datenschutz />} />
+            <Route path="/agb" element={<AGB />} />
+            <Route path="/widerruf" element={<Widerruf />} />
+            <Route path="*" element={<div className="max-w-6xl mx-auto px-4 py-24 text-center"><h1 className="text-3xl">Seite nicht gefunden</h1></div>} />
+          </Routes>
+        </Suspense>
       </main>
       <Footer />
+      <ConsentBanner />
     </div>
   );
 }

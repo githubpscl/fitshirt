@@ -11,6 +11,7 @@ export default function Admin() {
   const [orders, setOrders] = useState([]);
   const [inventory, setInventory] = useState([]);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [productionFilter, setProductionFilter] = useState('all');
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(null);
   const [tab, setTab] = useState('orders');
@@ -135,13 +136,25 @@ export default function Admin() {
 
       {tab === 'orders' && (
         <div>
-          <div className="flex flex-wrap gap-2 mb-4">
-            {STATUS_OPTIONS.map((s) => (
-              <button key={s} onClick={() => setStatusFilter(s)}
-                className={`px-3 py-1 rounded-full text-xs ${statusFilter === s ? 'bg-primary text-cream' : 'bg-primary-50 text-primary-500'}`}>
-                {s === 'all' ? 'Alle' : STATUS_LABELS[s]}
-              </button>
-            ))}
+          <div className="space-y-3 mb-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-primary-400 uppercase tracking-wider mr-1">Status:</span>
+              {STATUS_OPTIONS.map((s) => (
+                <button key={s} onClick={() => setStatusFilter(s)}
+                  className={`px-3 py-1 rounded-full text-xs ${statusFilter === s ? 'bg-primary text-cream' : 'bg-primary-50 text-primary-500'}`}>
+                  {s === 'all' ? 'Alle' : STATUS_LABELS[s]}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-primary-400 uppercase tracking-wider mr-1">Produktion:</span>
+              {[['all', 'Alle'], ['match', 'Smart Match'], ['mtm', 'Made-to-Measure']].map(([id, label]) => (
+                <button key={id} onClick={() => setProductionFilter(id)}
+                  className={`px-3 py-1 rounded-full text-xs ${productionFilter === id ? 'bg-primary text-cream' : 'bg-primary-50 text-primary-500'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="card overflow-hidden">
@@ -152,6 +165,7 @@ export default function Admin() {
                     <th className="p-3">Bestellnr.</th>
                     <th className="p-3">Datum</th>
                     <th className="p-3">Kunde</th>
+                    <th className="p-3">Produktion</th>
                     <th className="p-3">Schnitt</th>
                     <th className="p-3">Farbe</th>
                     <th className="p-3">Status</th>
@@ -159,10 +173,18 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.length === 0 && (
-                    <tr><td colSpan="7" className="p-6 text-center text-primary-400">Keine Bestellungen</td></tr>
-                  )}
-                  {orders.map((o) => {
+                  {(() => {
+                    const filteredOrders = orders.filter((o) =>
+                      productionFilter === 'all' ? true : (o.productionType || 'match') === productionFilter,
+                    );
+                    if (filteredOrders.length === 0) {
+                      return <tr><td colSpan="8" className="p-6 text-center text-primary-400">Keine Bestellungen</td></tr>;
+                    }
+                    return null;
+                  })()}
+                  {orders.filter((o) =>
+                    productionFilter === 'all' ? true : (o.productionType || 'match') === productionFilter,
+                  ).map((o) => {
                     const color = COLORS.find((c) => c.id === o.color);
                     const open = expanded === o.id;
                     return (
@@ -171,7 +193,16 @@ export default function Admin() {
                           <td className="p-3 font-mono text-xs">{o.id}</td>
                           <td className="p-3 text-primary-500">{new Date(o.createdAt).toLocaleDateString('de-DE')}</td>
                           <td className="p-3">{o.customer.firstName} {o.customer.lastName}</td>
-                          <td className="p-3">{o.patternId}</td>
+                          <td className="p-3">
+                            <span className={`text-xs px-2 py-1 rounded-full ${
+                              o.productionType === 'mtm'
+                                ? 'bg-accent text-primary'
+                                : 'bg-primary-50 text-primary-500'
+                            }`}>
+                              {o.productionType === 'mtm' ? 'MTM' : 'Match'}
+                            </span>
+                          </td>
+                          <td className="p-3">{o.patternId || <span className="text-primary-300">—</span>}</td>
                           <td className="p-3">
                             <span className="inline-flex items-center gap-2">
                               <span className="inline-block w-3 h-3 rounded-full ring-1 ring-primary-200"
@@ -196,7 +227,7 @@ export default function Admin() {
                         </tr>
                         {open && (
                           <tr className="bg-primary-50/30 border-t border-primary-100">
-                            <td colSpan="7" className="p-5">
+                            <td colSpan="8" className="p-5">
                               <div className="grid sm:grid-cols-3 gap-6 text-xs">
                                 <div>
                                   <div className="text-primary-400 uppercase tracking-wider mb-1">Kontakt</div>
